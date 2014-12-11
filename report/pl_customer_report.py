@@ -200,6 +200,8 @@ class Parser(report_sxw.rml_parse):
                     if n==0:
                         n=1
                     line[16] = round(Total / (n),2)
+                    if year in years:
+                        line[16] = round(Total / (monty),2)
                     n=0
                     lines.append(line)
                 if ln['company']:
