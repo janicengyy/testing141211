@@ -136,7 +136,12 @@ class Parser(report_sxw.rml_parse):
         period_obj=self.pool.get('account.period')
         partner_obj=self.pool.get('res.partner')
         if sale_id:
-            partner_ids=partner_obj.search(cr,uid,[('user_id','=',sale_id)])
+                sql=""" select id from res_partner where user_id=%s"""%(sale_id,)
+                cr.execute(sql)
+                users=cr.dictfetchall()
+                partner_ids=[]
+                for user in users:
+                    partner_ids.append(user['id'])
         else:
             partner_ids=partner_obj.search(cr,uid,[('user_id','in',sale_ids)])
         period_ids=period_obj.search(cr,uid,[('fiscalyear_id','=',year_id)])
