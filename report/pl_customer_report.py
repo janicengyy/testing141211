@@ -32,7 +32,15 @@ class Parser(report_sxw.rml_parse):
     def printSales(self):
         sale_id=self.localcontext.get('sale_id',False)
         year_id=self.localcontext.get('year_id',False)
-        name=self.pool.get('res.users').browse(self.cr, self.uid, [sale_id])[0].name
+        name='ALL'
+        cr = self.cr
+        uid=self.uid
+        user_obj=self.pool.get('res.users')
+        if sale_id:
+            sql=""" select id from res_users where id=%s"""%(sale_id)
+            cr.execute(sql)
+            user=cr.dictfetchall()
+            name=user_obj.browse(cr, uid, user[0]['id']).name
         yesr=self.pool.get('account.fiscalyear').browse(self.cr, self.uid, [year_id])[0].name
         show=self.localcontext.get('show',False)
         if show:
@@ -47,19 +55,33 @@ class Parser(report_sxw.rml_parse):
     def printSale(self):
         cr = self.cr
         uid=self.uid
+        sale_ids=[]
         sale_id=self.localcontext.get('sale_id',False)
+        if not sale_id:
+                sql=""" select user_id from account_invoice GROUP BY user_id"""
+                cr.execute(sql)
+                users=cr.dictfetchall()
+                users = users[1:]
+                for res in users:
+                    if res['user_id']:
+                        sale_ids.append(res['user_id'])
         year_id=self.localcontext.get('year_id',False)
         show=self.localcontext.get('show',False)
         account_obj=self.pool.get('account.move.line')
         ac_obj=self.pool.get('account.account')
         period_obj=self.pool.get('account.period')
         partner_obj=self.pool.get('res.partner')
-        partner_ids=partner_obj.search(cr,uid,[('user_id','=',sale_id)])
+        if sale_id:
+            partner_ids=partner_obj.search(cr,uid,[('user_id','=',sale_id)])
+        else:
+            partner_ids=partner_obj.search(cr,uid,[('user_id','in',sale_ids)])
         period_ids=period_obj.search(cr,uid,[('fiscalyear_id','=',year_id)])
         ac_ids=ac_obj.search(cr,uid,[('reports','=',True)])
+        
         a_ids = ("%s" % ac_ids).replace('[', '(').replace(']', ')')
         p_ids = ("%s" % partner_ids).replace('[', '(').replace(']', ')')
         pe_ids = ("%s" % period_ids).replace('[', '(').replace(']', ')')
+        
         
         if a_ids == "()": a_ids = "(0)"
         if p_ids == "()": p_ids = "(0)"
@@ -151,6 +173,7 @@ class Parser(report_sxw.rml_parse):
             res2=cr.dictfetchall()
             pre_partner2 = False
             n2=0
+            Total=0
             for ln in res2:
                 if ln["pid"] != pre_partner2:
                     if line2:
@@ -169,7 +192,10 @@ class Parser(report_sxw.rml_parse):
             n2-=1
             if n2==0:
                 n2=1
-            line2[1] = Total / (monty-n2)
+            if Total!=0:
+                line2[1] = float(Total) / float(monty)
+            else:
+                line2 = [0,0]
             lines2.append(line2)
             lines2=sorted(lines2,key = lambda line: line[1],reverse=True)
             
