@@ -222,6 +222,8 @@ class Parser(report_sxw.rml_parse):
             n=1
         line[15] = round(Total,2)
         line[16] = round(Total / (n),2)
+        if year in years:
+            line[16] = round(Total / (monty),2)
         if line: 
             lines.append(line)
             
