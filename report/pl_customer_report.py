@@ -94,7 +94,8 @@ class Parser(report_sxw.rml_parse):
         ac_ids=ac_obj.search(cr,uid,[('reports','=',True)])
         accounts=u'Sales Other'
         if ac_ids:
-            accounts=res[0]['acname']
+            if res:
+                accounts=res[0]['acname']
         name='ALL'
         cr = self.cr
         uid=self.uid
