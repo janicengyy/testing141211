@@ -30,8 +30,71 @@ class Parser(report_sxw.rml_parse):
         })
         return super(Parser, self).set_context(objects, data, ids, report_type)
     def printSales(self):
+        cr = self.cr
+        uid=self.uid
+        sale_ids=[]
+        sale_id=self.localcontext.get('sale_id',False)
+        if not sale_id:
+                sql=""" select user_id from account_invoice GROUP BY user_id"""
+                cr.execute(sql)
+                users=cr.dictfetchall()
+                users = users[1:]
+                for res in users:
+                    if res['user_id']:
+                        sale_ids.append(res['user_id'])
+        year_id=self.localcontext.get('year_id',False)
+        show=self.localcontext.get('show',False)
+        account_obj=self.pool.get('account.move.line')
+        ac_obj=self.pool.get('account.account')
+        period_obj=self.pool.get('account.period')
+        partner_obj=self.pool.get('res.partner')
+        if sale_id:
+            partner_ids=partner_obj.search(cr,uid,[('user_id','=',sale_id)])
+        else:
+            partner_ids=partner_obj.search(cr,uid,[('user_id','in',sale_ids)])
+        period_ids=period_obj.search(cr,uid,[('fiscalyear_id','=',year_id)])
+        ac_ids=ac_obj.search(cr,uid,[('reports','=',True)])
+        
+        a_ids = ("%s" % ac_ids).replace('[', '(').replace(']', ')')
+        p_ids = ("%s" % partner_ids).replace('[', '(').replace(']', ')')
+        pe_ids = ("%s" % period_ids).replace('[', '(').replace(']', ')')
+        
+        
+        if a_ids == "()": a_ids = "(0)"
+        if p_ids == "()": p_ids = "(0)"
+        if pe_ids == "()": pe_ids = "(0)"
+        
+        year=self.pool.get('account.fiscalyear').browse(self.cr, self.uid, [year_id])[0].name
+        monty =12
+        years=str(time.localtime()[0])
+        if year in years:
+            monty = time.localtime()[1] or 12
+        pe_ids1 = None
+        if year_id-1!=0:
+            period_ids1=period_obj.search(cr,uid,[('fiscalyear_id','=',year_id-1)])
+            pe_ids1 = ("%s" % period_ids1).replace('[', '(').replace(']', ')')
+            if pe_ids1 == "()": pe_ids1 = "(0)"
+        sql = """
+        select ac.name as acname,avl.partner_id as pid, avl.period_id as period, p.name as pnm,p.is_company as company, sum(avl.credit) as amount from account_move_line avl 
+        left join res_partner p on(avl.partner_id = p.id)
+        left join account_account ac on(avl.account_id =ac.id)
+        where partner_id in %s and period_id in %s and account_id in %s
+        group by ac.name,avl.partner_id, avl.period_id, p.name, p.is_company
+        order by  avl.partner_id, avl.period_id 
+        """ % (p_ids, pe_ids,a_ids)
+        cr.execute(sql)
+        res=cr.dictfetchall()
+        
+        
+        
+        
         sale_id=self.localcontext.get('sale_id',False)
         year_id=self.localcontext.get('year_id',False)
+        ac_obj=self.pool.get('account.account')
+        ac_ids=ac_obj.search(cr,uid,[('reports','=',True)])
+        accounts=u'Sales Other'
+        if ac_ids:
+            accounts=res[0]['acname']
         name='ALL'
         cr = self.cr
         uid=self.uid
@@ -49,7 +112,7 @@ class Parser(report_sxw.rml_parse):
             t='NO'
         lines = []
         line = None 
-        line = [yesr,name,t]
+        line = [yesr,name,t,accounts]
         lines.append(line)
         return lines
     def printSale(self):
@@ -130,7 +193,7 @@ class Parser(report_sxw.rml_parse):
                     line[15] = round(Total,2)
                     if n==0:
                         n=1
-                    line[16] = round(Total / (monty-n),2)
+                    line[16] = round(Total / (n),2)
                     n=0
                     lines.append(line)
                 if ln['company']:
@@ -152,7 +215,7 @@ class Parser(report_sxw.rml_parse):
         if n==0:
             n=1
         line[15] = round(Total,2)
-        line[16] = round(Total / (monty-n),2)
+        line[16] = round(Total / (n),2)
         if line: 
             lines.append(line)
             
@@ -177,7 +240,7 @@ class Parser(report_sxw.rml_parse):
             for ln in res2:
                 if ln["pid"] != pre_partner2:
                     if line2:
-                        line2[1] = Total / (monty-n2)
+                        line2[1] = Total / (n2)
                         n2=0
                         lines2.append(line2)
                     line2 = [ln["pid"],0]
@@ -193,7 +256,7 @@ class Parser(report_sxw.rml_parse):
             if n2==0:
                 n2=1
             if Total!=0:
-                line2[1] = float(Total) / float(monty)
+                line2[1] = float(Total) / float(n2)
             else:
                 line2 = [0,0]
             lines2.append(line2)
